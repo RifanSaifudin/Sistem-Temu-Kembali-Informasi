@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Subtitle Translator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f9;
+        }
+        .container {
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #ffffff;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+        }
+        h1 { text-align: center; color: #333; }
+        label, select, button, input {
+            display: block; width: 100%; margin-bottom: 20px;
+        }
+        button {
+            background-color: #007BFF; color: white; font-size: 16px; border: none; cursor: pointer;
+        }
+        button:hover { background-color: #0056b3; }
+        .output { background: #f9f9f9; padding: 10px; border-radius: 5px; color: #333; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Video Subtitle Translator</h1>
+
+        <label for="videoInput">Upload Video:</label>
+        <input type="file" id="videoInput" accept="video/*">
+
+        <label for="language">Select Target Language:</label>
+        <select id="language">
+            <option value="es">Spanish</option>
+            <option value="fr">French</option>
+            <option value="de">German</option>
+            <option value="id">Indonesian</option>
+        </select>
+
+        <button id="processButton">Process Video</button>
+        <h3>Transcription:</h3>
+        <div id="transcription" class="output">No transcription yet.</div>
+
+        <h3>Translation:</h3>
+        <div id="translation" class="output">No translation yet.</div>
+    </div>
+
+    <script>
+        document.getElementById('processButton').addEventListener('click', async () => {
+            const videoInput = document.getElementById('videoInput');
+            const language = document.getElementById('language').value;
+            const transcriptionDiv = document.getElementById('transcription');
+            const translationDiv = document.getElementById('translation');
+
+            if (!videoInput.files[0]) {
+                alert('Please upload a video file!');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('video', videoInput.files[0]);
+
+            // Step 1: Extract audio
+            const audioResponse = await fetch('http://127.0.0.1:5000/extract_audio', {
+                method: 'POST',
+                body: formData,
+            });
+            const audioData = await audioResponse.json();
+
+            if (!audioData.audio_file) {
+                alert('Audio extraction failed!');
+                return;
+            }
+
+            // Step 2: Transcribe audio
+            const transcribeResponse = await fetch('http://127.0.0.1:5000/transcribe', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ audio_file: audioData.audio_file }),
+            });
+            const transcribeData = await transcribeResponse.json();
+
+            if (transcribeData.error) {
+                alert('Transcription failed: ' + transcribeData.error);
+                return;
+            }
+
+            transcriptionDiv.innerText = transcribeData.text;
+
+            // Step 3: Translate text
+            const translateResponse = await fetch('http://127.0.0.1:5000/translate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: transcribeData.text, target_language: language }),
+            });
+            const translateData = await translateResponse.json();
+
+            if (translateData.error) {
+                alert('Translation failed: ' + translateData.error);
+                return;
+            }
+
+            translationDiv.innerText = translateData.translated_text;
+        });
+    </script>
+</body>
+</html>
